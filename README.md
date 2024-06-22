@@ -6,7 +6,7 @@ written in Python. Dependency management in Python is a nightmare, so I decided 
 ## Installation
 
 ```bash
-go install github.com/perbu/tts-cli
+go install github.com/perbu/tts-cli@latest
 ```
 
 ## Usage
