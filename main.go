@@ -52,9 +52,9 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 		return fmt.Errorf("usage: %s <input-file>", args[0])
 	}
 	inputFileName := flag.Arg(0)
-	// Output file is the same as the input file, but with a .aac extension:
+
 	if *outputFlag == "" {
-		*outputFlag = inputFileName + ".aac"
+		*outputFlag = inputFileName + ".mp3"
 	}
 
 	// Slurp the input file:
