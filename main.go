@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
@@ -13,6 +14,9 @@ import (
 	"strings"
 	"syscall"
 )
+
+//go:embed .version
+var embeddedVersion string
 
 const (
 	apiKeyEnvVar = "OPENAI_API_KEY"
@@ -31,8 +35,14 @@ func main() {
 
 func run(ctx context.Context, stdout *os.File, args []string, env []string) error {
 	debugFlag := flag.Bool("d", false, "Enable debug output")
+	outputFlag := flag.String("o", "", "Output file")
+	versionFlag := flag.Bool("v", false, "Print version and exit")
 	if err := flag.CommandLine.Parse(args[1:]); err != nil {
 		return fmt.Errorf("flag.CommandLine.Parse: %w", err)
+	}
+	if *versionFlag {
+		fmt.Println(embeddedVersion)
+		return nil
 	}
 	if *debugFlag {
 		fmt.Fprintln(stdout, "debug output enabled")
@@ -43,7 +53,9 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 	}
 	inputFileName := flag.Arg(0)
 	// Output file is the same as the input file, but with a .aac extension:
-	outputFileName := inputFileName + ".aac"
+	if *outputFlag == "" {
+		*outputFlag = inputFileName + ".aac"
+	}
 
 	// Slurp the input file:
 	input, err := os.ReadFile(inputFileName)
@@ -61,13 +73,13 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 	c := openai.NewClient(apiKey)
 
 	// Open the output for writing:
-	output, err := os.OpenFile(outputFileName, os.O_CREATE|os.O_WRONLY, 0644)
+	output, err := os.OpenFile(*outputFlag, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("os.Create: %w", err)
 	}
 	defer output.Close()
 	if *debugFlag {
-		fmt.Fprintf(stdout, "opened %s for writing\n", outputFileName)
+		fmt.Fprintf(stdout, "opened %s for writing\n", *outputFlag)
 	}
 	ttsOutput, err := tts.Speech(ctx, c, string(input), *debugFlag)
 	if err != nil {
@@ -88,7 +100,7 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 			return fmt.Errorf("output.Write: %w", err)
 		}
 		if *debugFlag {
-			fmt.Fprintf(stdout, "wrote %d bytes to %s\n", n, outputFileName)
+			fmt.Fprintf(stdout, "wrote %d bytes to %s\n", n, *outputFlag)
 		}
 	}
 	return nil
