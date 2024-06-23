@@ -27,8 +27,8 @@ func SplitText(maxLength int, input string) ([]string, error) {
 }
 
 // SplitParagraphs splits the input text into paragraphs. A paragraph is defined as a sequence of
-// characters that ends with two or more newlines. The newlines will be included in the output
-// except for the last paragraph.
+// characters that ends with two or more newlines. When paragraphs are merged, each paragraph will be separated
+// with a single newline. If a paragraph is too long, it will be split at sentence boundaries.
 func SplitParagraphs(maxLength int, input string) ([]string, error) {
 	if len(input) <= maxLength {
 		return []string{input}, nil
