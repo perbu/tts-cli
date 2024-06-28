@@ -6,9 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/joho/godotenv"
-	"github.com/perbu/tts-cli/tts"
+	"github.com/perbu/tts-cli/ai"
+	"github.com/perbu/tts-cli/feed"
 	"github.com/sashabaranov/go-openai"
-	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
@@ -35,7 +36,6 @@ func main() {
 
 func run(ctx context.Context, stdout *os.File, args []string, env []string) error {
 	debugFlag := flag.Bool("d", false, "Enable debug output")
-	outputFlag := flag.String("o", "", "Output file")
 	versionFlag := flag.Bool("v", false, "Print version and exit")
 	if err := flag.CommandLine.Parse(args[1:]); err != nil {
 		return fmt.Errorf("flag.CommandLine.Parse: %w", err)
@@ -51,59 +51,31 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 	if flag.NArg() != 1 {
 		return fmt.Errorf("usage: %s <input-file>", args[0])
 	}
-	inputFileName := flag.Arg(0)
-
-	if *outputFlag == "" {
-		*outputFlag = inputFileName + ".mp3"
+	workingDir := flag.Arg(0)
+	if workingDir == "" {
+		workingDir = "."
 	}
-
-	// Slurp the input file:
-	input, err := os.ReadFile(inputFileName)
-	if err != nil {
-		return fmt.Errorf("os.ReadFile: %w", err)
-	}
-	if *debugFlag {
-		fmt.Fprintf(stdout, "read %d bytes from %s\n", len(input), inputFileName)
-	}
-
+	logger := makeLogger(*debugFlag)
 	apiKey := getEnvStr(env, apiKeyEnvVar, "")
 	if apiKey == "" {
 		return fmt.Errorf("'%s' is required", apiKeyEnvVar)
 	}
-	c := openai.NewClient(apiKey)
-
-	// Open the output for writing:
-	output, err := os.OpenFile(*outputFlag, os.O_CREATE|os.O_WRONLY, 0644)
+	c := ai.New(openai.NewClient(apiKey))
+	// Create a new FeedManager
+	fm := feed.New(c, logger)
+	// Scan the directory for txt files and create missing elements
+	err := fm.Scan(ctx, workingDir)
 	if err != nil {
-		return fmt.Errorf("os.Create: %w", err)
+		return fmt.Errorf("fm.Scan: %w", err)
 	}
-	defer output.Close()
-	if *debugFlag {
-		fmt.Fprintf(stdout, "opened %s for writing\n", *outputFlag)
-	}
-	ttsOutput, err := tts.Speech(ctx, c, string(input), *debugFlag)
+	// Generate the RSS feed
+	rss, err := fm.GenerateRSS()
 	if err != nil {
-		return fmt.Errorf("tts.Speech: %w", err)
+		return fmt.Errorf("fm.GenerateRSS: %w", err)
 	}
-	// The below could be replaced with io.Copy(output, ttsOutput), but we want to print debug output:
-	for {
-		buf := make([]byte, 65536)
-		n, err := ttsOutput.Read(buf)
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("ttsOutput.Read: %w", err)
-		}
-		if n == 0 {
-			break
-		}
-		n, err = output.Write(buf[:n])
-		if err != nil {
-			return fmt.Errorf("output.Write: %w", err)
-		}
-		if *debugFlag {
-			fmt.Fprintf(stdout, "wrote %d bytes to %s\n", n, *outputFlag)
-		}
-	}
+	fmt.Println(rss)
 	return nil
+
 }
 
 func getEnvStr(env []string, key, defaultValue string) string {
@@ -117,4 +89,13 @@ func getEnvStr(env []string, key, defaultValue string) string {
 		}
 	}
 	return defaultValue
+}
+
+func makeLogger(debug bool) *slog.Logger {
+	level := slog.LevelInfo
+	if debug {
+		level = slog.LevelDebug
+	}
+	fh := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
+	return slog.New(fh)
 }

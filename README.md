@@ -1,10 +1,7 @@
-# tts-cli
+# AI Podcaster tool
 
-This is a simple CLI wrapper around the OpenAI Text-to-Speech API. There where already a few of these, but they were
-written in Python. Dependency management in Python is a nightmare, so I decided to write my own in Go.
-
-I use this, in addition to `make` and `dropcaster` to generate a podcast out of a bunch of text-files so I can "read" 
-them while biking or walking.
+This a tool to generate a podcast from a bunch of text files. It uses the OpenAI Text-to-Speech API to 
+generate the audio, ChatGPT to generate a summary and Dall-E to generate an image for the podcast.
 
 ## Installation
 

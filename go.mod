@@ -6,3 +6,5 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.26.0
 )
+
+require github.com/gorilla/feeds v1.2.0 // indirect
