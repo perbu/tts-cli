@@ -1,4 +1,6 @@
-.idea
-*.aac
-*.txt
+/.idea
+/*.mp3
+/*.txt
+/*.png
 /.env
+/channel.yaml
