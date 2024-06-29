@@ -9,6 +9,7 @@ import (
 	"github.com/perbu/tts-cli/ai"
 	"github.com/perbu/tts-cli/feed"
 	"github.com/sashabaranov/go-openai"
+	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -62,9 +63,15 @@ func run(ctx context.Context, stdout *os.File, args []string, env []string) erro
 	}
 	c := ai.New(openai.NewClient(apiKey))
 	// Create a new FeedManager
-	fm := feed.New(c, logger)
+
+	title, link, description, err := getChannelData()
+	if err != nil {
+		return fmt.Errorf("getChannelData: %w", err)
+	}
+
+	fm := feed.New(c, logger, title, link, description)
 	// Scan the directory for txt files and create missing elements
-	err := fm.Scan(ctx, workingDir)
+	err = fm.Scan(ctx, workingDir)
 	if err != nil {
 		return fmt.Errorf("fm.Scan: %w", err)
 	}
@@ -98,4 +105,32 @@ func makeLogger(debug bool) *slog.Logger {
 	}
 	fh := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
 	return slog.New(fh)
+}
+
+type ChannelMetadata struct {
+	Title       string
+	Link        string
+	Description string
+}
+
+func getChannelData() (string, string, string, error) {
+	var cm ChannelMetadata
+	metadataBytes, err := os.ReadFile("channel.yaml")
+	if err != nil {
+		return "", "", "", fmt.Errorf("os.ReadFile: %w", err)
+	}
+	err = yaml.Unmarshal(metadataBytes, &cm)
+	if err != nil {
+		return "", "", "", fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+	if cm.Title == "" {
+		return "", "", "", fmt.Errorf("title is required")
+	}
+	if cm.Link == "" {
+		return "", "", "", fmt.Errorf("link is required")
+	}
+	if cm.Description == "" {
+		return "", "", "", fmt.Errorf("description is required")
+	}
+	return cm.Title, cm.Link, cm.Description, nil
 }

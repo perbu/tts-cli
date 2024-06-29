@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path"
 	"sort"
@@ -20,16 +21,20 @@ type abtractIntelligence interface {
 }
 
 type FeedManager struct {
-	openAI   abtractIntelligence
-	episodes []Episode
-	logger   *slog.Logger
+	openAI                   abtractIntelligence
+	episodes                 []Episode
+	logger                   *slog.Logger
+	title, link, description string
 }
 
-func New(openAI abtractIntelligence, logger *slog.Logger) *FeedManager {
+func New(openAI abtractIntelligence, logger *slog.Logger, title, link, description string) *FeedManager {
 	return &FeedManager{
-		episodes: make([]Episode, 0),
-		openAI:   openAI,
-		logger:   logger,
+		episodes:    make([]Episode, 0),
+		openAI:      openAI,
+		logger:      logger,
+		title:       title,
+		link:        link,
+		description: description,
 	}
 }
 func (f *FeedManager) Scan(ctx context.Context, directory string) error {
@@ -175,34 +180,44 @@ func (f *FeedManager) AddEpisode(ctx context.Context, contentFile string) error 
 
 func (f *FeedManager) GenerateRSS() (string, error) {
 	channel := &Channel{
-		Title:         "Your Podcast Title",
-		Link:          "https://yourpodcastwebsite.com",
-		Description:   "Your podcast description",
+		Title:         f.title,
+		Link:          f.link,
+		Description:   f.description,
 		Language:      "en-us",
 		PubDate:       time.Now().Format(time.RFC1123Z),
 		LastBuildDate: time.Now().Format(time.RFC1123Z),
 	}
 
 	for _, episode := range f.episodes {
+		textLink, err := url.JoinPath(f.link, episode.ContentFile)
+		if err != nil {
+			return "", fmt.Errorf("url.JoinPath(%s,%s): %w", f.link, episode.ContentFile, err)
+		}
 		item := &Item{
 			Title:       episode.ContentFile,
-			Link:        "https://yourpodcastwebsite.com/" + episode.ContentFile,
+			Link:        textLink,
 			Description: episode.Summary,
 			PubDate:     episode.Created.Format(time.RFC1123Z),
-			Guid:        "https://yourpodcastwebsite.com/" + episode.ContentFile,
+			//			Guid:
 		}
-
+		audiolink, err := url.JoinPath(f.link, episode.AudioFile)
+		if err != nil {
+			return "", fmt.Errorf("url.JoinPath(%s,%s): %w", f.link, episode.AudioFile, err)
+		}
 		if episode.AudioFile != "" {
 			item.Enclosure = &Enclosure{
-				URL:    "https://yourpodcastwebsite.com/" + episode.AudioFile,
-				Type:   "audio/mpeg",
-				Length: "0", // You should set the actual file size here
+				URL:  audiolink,
+				Type: "audio/mpeg",
+				// Length: "0", // You should set the actual file size here
 			}
 		}
-
-		if episode.IllustrationFile != "" {
+		illustrationLink, err := url.JoinPath(f.link, episode.IllustrationFile)
+		if err != nil {
+			illustrationLink = ""
+		}
+		if illustrationLink != "" {
 			item.ITunesImage = &ITunesImage{
-				Href: "https://yourpodcastwebsite.com/" + episode.IllustrationFile,
+				Href: illustrationLink,
 			}
 		}
 
