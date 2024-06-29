@@ -90,16 +90,22 @@ func (ai AI) Summary(ctx context.Context, content string) (string, error) {
 // Illustration generates an illustration for the document. It returns a byte slice, containing a PNG image.
 func (ai AI) Illustration(ctx context.Context, content string) ([]byte, error) {
 	resp, err := ai.client.CreateImage(ctx, openai.ImageRequest{
-		Model:  openai.CreateImageModelDallE2,
-		Prompt: "An illustration for a podcast with covering the following:\n" + content,
-		Size:   openai.CreateImageSize512x512,
-		N:      1,
+		Model:   openai.CreateImageModelDallE2,
+		Prompt:  "An very simple picture depicting the following:\n" + content,
+		Size:    openai.CreateImageSize512x512,
+		Quality: openai.CreateImageQualityStandard,
+		N:       1,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai.CreateImage: %w", err)
 	}
 	if len(resp.Data) == 0 {
 		return nil, fmt.Errorf("no data in response")
+	}
+
+	if resp.Data[0].URL == "" {
+		// if we get an empty URL, maybe the response is b64 encoded.
+		return nil, fmt.Errorf("empty URL in response")
 	}
 	contentUrl := resp.Data[0].URL
 	// get the content of the URL
@@ -111,6 +117,7 @@ func (ai AI) Illustration(ctx context.Context, content string) ([]byte, error) {
 	if resp2.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status code(payload): %d", resp2.StatusCode)
 	}
+
 	payload, err := io.ReadAll(resp2.Body)
 	if err != nil {
 		return nil, fmt.Errorf("io.ReadAll: %w", err)
